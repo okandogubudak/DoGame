@@ -8,15 +8,15 @@ import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
-import 'sound_manager.dart';
-import 'score_manager.dart';
-import 'vibration_manager.dart';
-import 'settings_manager.dart';
-import 'level_spawner.dart';
+import '../../services/sound_manager.dart';
+import '../../services/score_manager.dart';
+import '../../services/vibration_manager.dart';
+import '../../services/settings_manager.dart';
+import '../../services/level_spawner.dart';
 
 // Import gerekli türleri
-export 'settings_manager.dart' show ControlType;
-export 'level_spawner.dart' show Difficulty, FeatureType;
+export '../../services/settings_manager.dart' show ControlType;
+export '../../services/level_spawner.dart' show Difficulty, FeatureType;
 
 /// A minimalist but extensible re-imagining of the classic
 /// "Ice Cold Beer" mechanical arcade game.
@@ -150,7 +150,8 @@ class BeerGame extends FlameGame with PanDetector, TapDetector, DoubleTapDetecto
   /// Kontrol tipi (ayarlardan değiştirilebilir)
   ControlType _controlType = ControlType.tilt;
 
-  SurfaceType _currentSurfaceType = SurfaceType.ice;
+  // Son engel tipini tutmak için (çeşitlilik için kullanılabilir)
+  // SurfaceType _currentSurfaceType = SurfaceType.ice;
 
   @override
   Future<void> onLoad() async {
@@ -584,6 +585,8 @@ class BeerGame extends FlameGame with PanDetector, TapDetector, DoubleTapDetecto
   }
 
   void _setupSensors() {
+    print('🎮 Sensörler başlatılıyor - Tilt kontrolü aktif');
+    
     _accelSub = accelerometerEvents.listen((event) {
       if (!isMounted) return;
       
@@ -593,10 +596,21 @@ class BeerGame extends FlameGame with PanDetector, TapDetector, DoubleTapDetecto
       // X ekseni: telefon sağa eğilirse negatif, sola eğilirse pozitif değer
       // İşareti çeviriyoruz ki sağ eğim = sağ taraf aşağı olsun
       _rawTilt = -event.x * tiltSensitivity;
+      
       // Eğim değerini sınırla (çok aşırı eğimleri önler)
       _rawTilt = _rawTilt.clamp(-maxTilt, maxTilt);
+      
+      // Debug: Her 60 frame'de bir tilt değerini göster
+      if (_debugFrameCount % 60 == 0) {
+        print('📱 Tilt değeri: ${_rawTilt.toStringAsFixed(2)} (Ham: ${event.x.toStringAsFixed(2)})');
+      }
+      _debugFrameCount++;
+    }, onError: (error) {
+      print('❌ Sensör hatası: $error');
     });
   }
+  
+  int _debugFrameCount = 0;
 
     /// Tüm eski özellikleri temizle (seviye geçişinde)
   void _clearAllFeatures() {
@@ -2142,9 +2156,86 @@ class BarComponent extends PositionComponent with HasGameRef<BeerGame> {
 
   @override
   void render(Canvas canvas) {
-    // Modern bar render kodu buraya gelecek - şimdilik basit çizim
-    final paint = Paint()..color = _color;
-    canvas.drawRect(Rect.fromCenter(center: Offset(length/2, thickness/2), width: length, height: thickness), paint);
+    // Modern, premium bar render
+    canvas.save();
+    
+    // Bar'ın pozisyonuna git
+    canvas.translate(position.x, position.y);
+    canvas.rotate(_angle);
+    
+    // Bar gölgesi
+    final shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.3)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: const Offset(0, 2), width: length, height: thickness),
+        Radius.circular(thickness / 2),
+      ),
+      shadowPaint,
+    );
+    
+    // Ana bar gradient
+    final gradientPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          _color.withOpacity(0.9),
+          _color,
+          _color.withOpacity(0.7),
+        ],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromCenter(center: Offset.zero, width: length, height: thickness));
+    
+    // Bar çiz (yuvarlatılmış köşeler)
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset.zero, width: length, height: thickness),
+        Radius.circular(thickness / 2),
+      ),
+      gradientPaint,
+    );
+    
+    // Üst highlight (parlak çizgi)
+    final highlightPaint = Paint()
+      ..color = Colors.white.withOpacity(0.4)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(0, -thickness/4), width: length * 0.9, height: thickness / 3),
+        Radius.circular(thickness / 4),
+      ),
+      highlightPaint,
+    );
+    
+    // Metal uçlar (kenar efekti)
+    final metalPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.white.withOpacity(0.6),
+          _color.withOpacity(0.3),
+        ],
+      ).createShader(Rect.fromCircle(center: Offset(-length/2, 0), radius: thickness));
+    
+    canvas.drawCircle(Offset(-length/2, 0), thickness / 2, metalPaint);
+    canvas.drawCircle(Offset(length/2, 0), thickness / 2, metalPaint);
+    
+    // Kenar vurgusu
+    final edgePaint = Paint()
+      ..color = Colors.white.withOpacity(0.3)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset.zero, width: length, height: thickness),
+        Radius.circular(thickness / 2),
+      ),
+      edgePaint,
+    );
+    
+    canvas.restore();
   }
 }
 
@@ -2156,11 +2247,11 @@ class BallComponent extends PositionComponent with HasGameRef<BeerGame> {
   final BarComponent bar;
 
   Vector2 _velocity = Vector2.zero();
-  double _offset = 0;
+  // double _offset = 0;  // Gelecekte kullanılabilir
   bool _isOnBar = true;
-  double _noBarAttachTime = 0;
+  // double _noBarAttachTime = 0;  // Gelecekte kullanılabilir
   bool _isAnimating = false;
-  double _rotationAngle = 0;
+  // double _rotationAngle = 0;  // Gelecekte kullanılabilir
   
   @override
   Future<void> onLoad() async {
@@ -2170,10 +2261,10 @@ class BallComponent extends PositionComponent with HasGameRef<BeerGame> {
   }
 
   void reset() {
-    _offset = 0;
+    // _offset = 0;  // Gelecekte kullanılabilir
     _velocity = Vector2.zero();
     _isOnBar = true;
-    _rotationAngle = 0;
+    // _rotationAngle = 0;  // Gelecekte kullanılabilir
     
     if (bar.isMounted) {
       final barCenterX = bar.position.x + bar.length / 2;
@@ -2182,14 +2273,50 @@ class BallComponent extends PositionComponent with HasGameRef<BeerGame> {
         barCenterX,
         barCenterY - bar.thickness - radius - 2,
       );
+      
+      print('🔴 Top pozisyonu sıfırlandı: x=${position.x.toStringAsFixed(1)}, y=${position.y.toStringAsFixed(1)}, radius=$radius');
     }
   }
 
   @override
   void render(Canvas canvas) {
-    // Modern ball render kodu buraya gelecek - şimdilik basit çizim
-    final paint = Paint()..color = Colors.black;
-    canvas.drawCircle(Offset(radius, radius), radius, paint);
+    // Modern, parlak ve görünür top render
+    
+    // Ana top gölgesi
+    final shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.3)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    canvas.drawCircle(Offset(radius + 2, radius + 2), radius * 0.9, shadowPaint);
+    
+    // Gradient arka plan (parlak altın/turuncu)
+    final gradientPaint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment(-0.3, -0.3),
+        colors: [
+          const Color(0xFFFFD700), // Parlak altın
+          const Color(0xFFFFA500), // Turuncu
+          const Color(0xFFFF4500), // Kırmızı-turuncu
+        ],
+        stops: const [0.0, 0.6, 1.0],
+      ).createShader(Rect.fromCircle(center: Offset(radius, radius), radius: radius));
+    
+    canvas.drawCircle(Offset(radius, radius), radius, gradientPaint);
+    
+    // Parlama efekti (highlight)
+    final highlightPaint = Paint()
+      ..color = Colors.white.withOpacity(0.6)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(Offset(radius * 0.7, radius * 0.7), radius * 0.35, highlightPaint);
+    
+    // İç highlight
+    final innerHighlight = Paint()..color = Colors.white.withOpacity(0.3);
+    canvas.drawCircle(Offset(radius * 0.6, radius * 0.6), radius * 0.25, innerHighlight);
+    
+    // Dış parlama (glow) - oyun içinde gözüksün
+    final glowPaint = Paint()
+      ..color = const Color(0xFFFFA500).withOpacity(0.4)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 15);
+    canvas.drawCircle(Offset(radius, radius), radius * 1.2, glowPaint);
   }
 }
 

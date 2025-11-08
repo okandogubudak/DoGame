@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'beer_game.dart';
-import 'sound_manager.dart';
-import 'score_manager.dart';
-import 'vibration_manager.dart';
-import 'level_spawner.dart';
-import 'settings_manager.dart';
+import '../game_engine/beer_game.dart';
+import '../../services/sound_manager.dart';
+import '../../services/score_manager.dart';
+import '../../services/vibration_manager.dart';
+import '../../services/level_spawner.dart';
+import '../../services/settings_manager.dart';
 
 class StartOverlay extends StatefulWidget {
   const StartOverlay({super.key, required this.game});

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'beer_game.dart';
-import 'sound_manager.dart';
-import 'vibration_manager.dart';
+import '../game_engine/beer_game.dart';
+import '../../services/sound_manager.dart';
+import '../../services/vibration_manager.dart';
 
 class PauseMenu extends StatelessWidget {
   const PauseMenu({super.key, required this.game});

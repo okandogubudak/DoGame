@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Gerekli izinler -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    
+    <!-- Sensör gereksinimleri -->
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true"/>
+    
     <application
         android:label="dogame"
         android:name="${applicationName}"

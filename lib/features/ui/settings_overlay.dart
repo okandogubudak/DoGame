@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'beer_game.dart';
-import 'settings_manager.dart';
-import 'sound_manager.dart';
-import 'vibration_manager.dart';
+import '../game_engine/beer_game.dart';
+import '../../services/settings_manager.dart';
+import '../../services/sound_manager.dart';
+import '../../services/vibration_manager.dart';
 
 class SettingsOverlay extends StatefulWidget {
   const SettingsOverlay({super.key, required this.game});

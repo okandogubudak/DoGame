@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'beer_game.dart';
-import 'sound_manager.dart';
-import 'score_manager.dart';
+import '../game_engine/beer_game.dart';
+import '../../services/sound_manager.dart';
+import '../../services/score_manager.dart';
 
 class GameOverOverlay extends StatefulWidget {
   const GameOverOverlay({super.key, required this.game});

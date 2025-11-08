@@ -3,16 +3,23 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'beer_game.dart';
-import 'game_over.dart';
-import 'start_overlay.dart';
-import 'pause_menu.dart';
-import 'sound_manager.dart';
-import 'settings_overlay.dart';
-import 'level_spawner.dart';
+import 'features/game_engine/beer_game.dart';
+import 'features/ui/game_over.dart';
+import 'features/ui/start_overlay.dart';
+import 'features/ui/pause_menu.dart';
+import 'services/sound_manager.dart';
+import 'features/ui/settings_overlay.dart';
+import 'services/level_spawner.dart';
+import 'core/di/injection.dart';
+import 'screens/main_menu_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Dependency Injection kurulumu
+  await setupDependencyInjection();
+  
   await Flame.device.fullScreen();
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -33,6 +40,11 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.brown),
       ),
       home: const SplashScreen(),
+      routes: {
+        '/menu': (context) => const MainMenuScreen(),
+        '/game': (context) => const GameScreen(),
+        '/settings': (context) => const SettingsScreen(),
+      },
     );
   }
 }
@@ -52,11 +64,11 @@ class _SplashScreenState extends State<SplashScreen> {
     // LevelSpawner'ı yükle
     _initializeGame();
     
-    // 2 saniye sonra ana ekrana geç
+    // 2 saniye sonra ana menüye geç
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const GameScreen()),
+          MaterialPageRoute(builder: (_) => const MainMenuScreen()),
         );
       }
     });
