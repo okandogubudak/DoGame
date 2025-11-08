@@ -6,6 +6,8 @@ class ComboSystem {
   ComboSystem({
     this.onComboChange,
     this.onMultiplierChange,
+    this.onComboChanged,
+    this.onComboReset,
   });
 
   int combo = 0;
@@ -14,6 +16,8 @@ class ComboSystem {
   
   final Function(int combo)? onComboChange;
   final Function(int multiplier)? onMultiplierChange;
+  final Function(int combo, int multiplier)? onComboChanged;
+  final Function()? onComboReset;
   
   static const Duration comboDuration = Duration(seconds: 2);
   static const int maxMultiplier = 10;
@@ -31,6 +35,7 @@ class ComboSystem {
     }
     
     onComboChange?.call(combo);
+    onComboChanged?.call(combo, multiplier);
     
     // Combo timer'ı yenile
     comboTimer?.cancel();
@@ -46,6 +51,7 @@ class ComboSystem {
       multiplier = 1;
       onComboChange?.call(combo);
       onMultiplierChange?.call(multiplier);
+      onComboReset?.call();
     }
     comboTimer?.cancel();
   }

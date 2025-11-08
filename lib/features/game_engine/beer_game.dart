@@ -13,6 +13,9 @@ import '../../services/score_manager.dart';
 import '../../services/vibration_manager.dart';
 import '../../services/settings_manager.dart';
 import '../../services/level_spawner.dart';
+import '../../core/game/health_bar_component.dart';
+import '../../core/game/combo_system.dart';
+import '../../core/game/floating_text.dart';
 
 // Import gerekli türleri
 export '../../services/settings_manager.dart' show ControlType;
@@ -108,6 +111,11 @@ class BeerGame extends FlameGame with PanDetector, TapDetector, DoubleTapDetecto
   int _playerLives = 3;
   late TextComponent _livesText;
   late List<TextComponent> _lifeIcons;
+  late HealthBarComponent _healthBar; // Modern sağlık barı
+
+  /// === COMBO SİSTEMİ ===
+  late ComboSystem _comboSystem;
+  late TextComponent _comboText;
 
   /// === PORTAL SİSTEMİ ===
 
@@ -217,6 +225,46 @@ class BeerGame extends FlameGame with PanDetector, TapDetector, DoubleTapDetecto
       add(lifeIcon);
       _lifeIcons.add(lifeIcon);
     }
+
+    // Modern HealthBar Component (sağ üstte)
+    _healthBar = HealthBarComponent(
+      maxHealth: 3,
+      position: Vector2(size.x - 20, 90),
+      barWidth: 120,
+      barHeight: 20,
+    );
+    add(_healthBar);
+
+    // Combo sistemi initialize
+    _comboSystem = ComboSystem(
+      onComboChanged: (combo, multiplier) {
+        _updateComboDisplay();
+      },
+      onComboReset: () {
+        _updateComboDisplay();
+      },
+    );
+
+    // Combo göstergesi (sol üstte, skor altında)
+    _comboText = TextComponent(
+      text: '',
+      textRenderer: TextPaint(
+        style: const TextStyle(
+          fontSize: 18,
+          color: Colors.amber,
+          fontWeight: FontWeight.bold,
+          shadows: [
+            Shadow(
+              color: Colors.black54,
+              offset: Offset(1, 1),
+              blurRadius: 2,
+            ),
+          ],
+        ),
+      ),
+      position: Vector2(20, 140),
+    );
+    add(_comboText);
 
     // Modern skor göstergesi
     _scoreText = TextComponent(
@@ -348,9 +396,19 @@ class BeerGame extends FlameGame with PanDetector, TapDetector, DoubleTapDetecto
       _levelText.position = Vector2(w * 0.05, h * 0.11);
     }
     
+    // Combo text (sol üst, level'ın altı)
+    if (_comboText.isMounted) {
+      _comboText.position = Vector2(w * 0.05, h * 0.14);
+    }
+    
     // Can göstergesi (sağ üst)
     if (_livesText.isMounted) {
       _livesText.position = Vector2(w * 0.78, h * 0.03);
+    }
+    
+    // HealthBar (sağ üst, can ikonlarının altı)
+    if (_healthBar.isMounted) {
+      _healthBar.position = Vector2(w - 20, h * 0.09);
     }
     
     for (int i = 0; i < _lifeIcons.length; i++) {
@@ -1276,6 +1334,9 @@ class BeerGame extends FlameGame with PanDetector, TapDetector, DoubleTapDetecto
   void reachedTarget() {
     level += 1; // Seviye artır
     
+    // Combo'yu artır
+    _comboSystem.hit();
+    
     // Süreyi durdur
     _stopLevelTimer();
     
@@ -1301,9 +1362,29 @@ class BeerGame extends FlameGame with PanDetector, TapDetector, DoubleTapDetecto
     // Kalan saniye puanı (kalan süre × zorluk çarpanı)
     int timeScore = (_remainingTime * difficultyMultiplier).round();
     
-    // Final skor hesaplama
-    int levelScore = timeScore + levelBonus;
+    // Base skor hesaplama
+    int baseScore = timeScore + levelBonus;
+    
+    // Combo çarpanı ile final skor
+    int levelScore = _comboSystem.calculateScore(baseScore);
     score += levelScore;
+    
+    // Floating text göster (skor animasyonu)
+    final scoreText = ScoreTextComponent(
+      score: levelScore,
+      position: _ball.position.clone(),
+    );
+    add(scoreText);
+    
+    // Combo varsa combo text de göster
+    if (_comboSystem.combo > 1) {
+      final comboText = ComboTextComponent(
+        combo: _comboSystem.combo,
+        multiplier: _comboSystem.multiplier,
+        position: _ball.position.clone() + Vector2(0, -30),
+      );
+      add(comboText);
+    }
     
     // High score kontrolü ve kaydetme - zorluk bazlı sistem
     if (_difficulty != null) {
@@ -1620,11 +1701,58 @@ class BeerGame extends FlameGame with PanDetector, TapDetector, DoubleTapDetecto
         _lifeIcons[i].text = i < _playerLives ? '❤️' : '🖤';
       }
     }
+    
+    // Modern sağlık barını güncelle
+    if (_healthBar.isMounted) {
+      _healthBar.updateHealth(_playerLives);
+    }
+  }
+
+  // === COMBO SİSTEMİ METODLARI ===
+  void _updateComboDisplay() {
+    if (!_comboText.isMounted) return;
+    
+    if (_comboSystem.combo > 0) {
+      final tier = _comboSystem.getComboTier();
+      _comboText.text = 'COMBO: ${_comboSystem.combo}x (x${_comboSystem.multiplier}) $tier';
+      
+      // Renk değiştir combo'ya göre
+      Color comboColor = Colors.amber;
+      if (_comboSystem.combo >= 20) {
+        comboColor = Colors.purple;
+      } else if (_comboSystem.combo >= 15) {
+        comboColor = Colors.red;
+      } else if (_comboSystem.combo >= 10) {
+        comboColor = Colors.orange;
+      } else if (_comboSystem.combo >= 5) {
+        comboColor = Colors.yellow;
+      }
+      
+      _comboText.textRenderer = TextPaint(
+        style: TextStyle(
+          fontSize: 18,
+          color: comboColor,
+          fontWeight: FontWeight.bold,
+          shadows: const [
+            Shadow(
+              color: Colors.black54,
+              offset: Offset(1, 1),
+              blurRadius: 2,
+            ),
+          ],
+        ),
+      );
+    } else {
+      _comboText.text = '';
+    }
   }
   
   void _loseLife() {
     _playerLives--;
     _updateLivesDisplay();
+    
+    // Combo'yu resetle (can kaybedildiğinde)
+    _comboSystem.resetCombo();
     
     // Ses ve titreşim
     SoundManager.instance.playLifeDown();
@@ -1678,6 +1806,7 @@ class BeerGame extends FlameGame with PanDetector, TapDetector, DoubleTapDetecto
   void onRemove() {
     _accelSub?.cancel();
     _levelTimer?.stop();
+    _comboSystem.dispose(); // Combo timer'ı temizle
     super.onRemove();
   }
 }
