@@ -297,6 +297,86 @@ class BeerGame extends FlameGame with PanDetector, TapDetector, DoubleTapDetecto
     _setupSensors();
   }
   
+  /// Responsive ekran uyumu
+  @override
+  Future<void> onGameResize(Vector2 size) async {
+    super.onGameResize(size);
+    
+    // Minimum ekran boyut kontrolü
+    const minWidth = 400.0;
+    const minHeight = 600.0;
+    
+    if (size.x < minWidth || size.y < minHeight) {
+      pauseEngine();
+      print('⚠️ Ekran çok küçük: ${size.x}x${size.y}');
+      return;
+    }
+    
+    // Bar hareket sınırlarını güncelle (ekranın %15-%85'i arası)
+    maxBarY = size.y * 0.85;
+    // minBarY zaten const 120
+    
+    // UI elementlerini yeniden konumlandır
+    _updateUIPositions();
+    
+    // Bar boyutunu responsive yapmak için referans alınabilir
+    // (length final olduğu için çalışma zamanında değiştirilemez)
+    if (_bar.isMounted) {
+      _bar.position.x = size.x / 2; // Merkez
+    }
+    
+    print('📐 Ekran yeniden boyutlandırıldı: ${size.x}x${size.y}');
+  }
+  
+  /// UI elementlerini yüzdelik konumlara göre yerleştir
+  void _updateUIPositions() {
+    final w = size.x;
+    final h = size.y;
+    
+    // Timer (üst merkez)
+    if (_timerText.isMounted) {
+      _timerText.position = Vector2(w * 0.5, h * 0.03);
+    }
+    
+    // Skor (sol üst)
+    if (_scoreText.isMounted) {
+      _scoreText.position = Vector2(w * 0.05, h * 0.08);
+    }
+    
+    // Level (sol üst, skorun altı)
+    if (_levelText.isMounted) {
+      _levelText.position = Vector2(w * 0.05, h * 0.11);
+    }
+    
+    // Can göstergesi (sağ üst)
+    if (_livesText.isMounted) {
+      _livesText.position = Vector2(w * 0.78, h * 0.03);
+    }
+    
+    for (int i = 0; i < _lifeIcons.length; i++) {
+      if (_lifeIcons[i].isMounted) {
+        _lifeIcons[i].position = Vector2(
+          w * 0.78 + (i * w * 0.04),
+          h * 0.055,
+        );
+      }
+    }
+    
+    // Pause ikonu (sağ üst köşe)
+    if (_pauseIcon.isMounted) {
+      _pauseIcon.position = Vector2(w * 0.95, h * 0.05);
+    }
+    
+    // Ses kontrol ikonları (sağ alt)
+    if (_soundIcon.isMounted && _musicIcon.isMounted) {
+      const margin = 18.0;
+      const iconSize = 28.0;
+      final y = h - margin - iconSize / 2;
+      _musicIcon.position = Vector2(w - margin - iconSize / 2 - iconSize - 18, y);
+      _soundIcon.position = Vector2(w - margin - iconSize / 2, y);
+    }
+  }
+  
   /// Ayarları yükle
   Future<void> _loadSettings() async {
     _controlType = await SettingsManager.instance.getControlType();
@@ -2267,14 +2347,26 @@ class BallComponent extends PositionComponent with HasGameRef<BeerGame> {
     // _rotationAngle = 0;  // Gelecekte kullanılabilir
     
     if (bar.isMounted) {
-      final barCenterX = bar.position.x + bar.length / 2;
-      final barCenterY = bar.baseY;
+      // DOĞRU KONUM HESAPLAMASI - Bar merkezinde
       position = Vector2(
-        barCenterX,
-        barCenterY - bar.thickness - radius - 2,
+        bar.position.x, // Bar zaten merkezdeyse direkt kullan
+        bar.position.y - bar.thickness / 2 - radius - 5, // 5px boşluk
       );
       
       print('🔴 Top pozisyonu sıfırlandı: x=${position.x.toStringAsFixed(1)}, y=${position.y.toStringAsFixed(1)}, radius=$radius');
+    }
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    
+    // Top bar üzerindeyken bar'ı TAKİP ETMELİ
+    if (_isOnBar && !_isAnimating && bar.isMounted) {
+      // Bar'ın X pozisyonunu sürekli takip et
+      position.x = bar.position.x;
+      // Y pozisyonu sabit kalmalı (bar'ın hemen üstünde)
+      position.y = bar.position.y - bar.thickness / 2 - radius - 5;
     }
   }
 
