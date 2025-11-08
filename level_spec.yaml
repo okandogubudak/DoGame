@@ -1,0 +1,162 @@
+###############################################################################
+# e-Site Arcade · LEVEL, PHYSICS, AUDIO, SPAWN CONFIG
+# Tamamı tek noktadan yönetilebilir yapı.
+###############################################################################
+
+global:
+  # Seviye sınırı
+  level_max: 9999            # "∞" yerine sayısal sentinel
+  # Bir bucket aralığındaki EASY / NORMAL / HARD ayrımı
+  # → İlk %33 = EASY, Orta %33 = NORMAL, Son %34 = HARD
+  difficulty_rule: thirds
+  # Aynı anda sahnede olabilecek maksimum özellik
+  max_simultaneous_features: 3
+  # Önce hangi eski özellikler denenir?
+  retro_priority: [square, bar, magnetic, pulsating, exploding]
+  # Ekstra can sarı nokta görünme kuralı
+  extra_life_spawn: "level%5==0 || level%9==0"
+  # Delik sayısı formülü (string eval edecek)
+  hole_formula: "2 + floor(level/5)"
+  # Log-decay fonksiyonu parametreleri
+  retro_probability:
+    base: 0.6
+    decay_rate: 0.03          # p = base * e^(-decay_rate * Δlevel)
+
+physics:
+  # Manyetik delik çekim katsayıları [EASY, NORMAL, HARD]
+  magnetic_force_factor: [0.8, 1.2, 1.5]
+  # Patlayıcı top patladıktan sonra yeni top spawn edilmez
+  respawn_new_ball: false
+  # Auto-Jump yalnız zemindeyken tetiklenir
+  auto_jump_requires_ground: true
+  # Pulsatif deliklerde seçilecek min. delik sayısı
+  min_pulsate: 1
+
+###############################################################################
+level_buckets:
+
+  # -------------------------------------------------------------------------
+  - id: EARLY
+    range: { min: 1, max: 9 }
+    new_feature: none
+    secondary_chances: {}          # hiçbiri
+    params: {}
+
+  # -------------------------------------------------------------------------
+  - id: STATIC_SQUARE
+    range: { min: 10, max: 19 }
+    new_feature: square
+    secondary_chances:             # Kare zaten ana özellik, diğerleri yok
+      square: 1.0                  # %100
+    params:
+      size_factor:   [1.0, 1.5, 2.0]        # × top Ø  (K,O,Z)
+      count_min:     2
+      count_max:     5
+      speed_penalty: 0.5                    # ball.velocity *= 0.5
+
+  # -------------------------------------------------------------------------
+  - id: MOVING_BAR
+    range: { min: 20, max: 29 }
+    new_feature: bar
+    secondary_chances:
+      square: 0.50                          # %50
+    params:
+      length_factor: [3, 4, 5]              # × top Ø
+      thickness_ratio: 0.333                # top Ø / 3
+      speed_px_s:   [30, 45, 60]            # (K,O,Z)
+      loop: true
+
+  # -------------------------------------------------------------------------
+  - id: MAGNETIC_HOLE
+    range: { min: 30, max: 39 }
+    new_feature: magnetic
+    secondary_chances:
+      square: 0.30
+      bar:    0.30
+    params:
+      diameter_factor: 1.5                  # × default hole Ø
+      effect_radius_factor: 3               # diameter × 3
+      force_factor_ref: physics.magnetic_force_factor
+
+  # -------------------------------------------------------------------------
+  - id: EXPLODING_BALL
+    range: { min: 40, max: 49 }
+    new_feature: exploding
+    secondary_chances:
+      magnetic: 0.20
+      square:   0.20
+      bar:      0.20
+    params:
+      fuse_seconds:   [15, 12, 10]          # (K,O,Z)
+      flash_colors:   ['#000000', '#FF0000']
+      explosion_duration_s: 0.5
+      damage_life: 1
+
+  # -------------------------------------------------------------------------
+  - id: PULSATING_HOLE
+    range: { min: 50, max: 59 }
+    new_feature: pulsating
+    secondary_chances:
+      exploding: 0.40
+    params:
+      affected_fraction: 0.30
+      scale_growth:  [1.25, 1.40, 1.50]     # +25/40/50 %
+      grow_time_s:   5
+      shrink_time_s: 5
+
+  # -------------------------------------------------------------------------
+  - id: AUTO_JUMP
+    range: { min: 60, max: 9999 }
+    new_feature: auto_jump
+    secondary_chances:
+      square:     0.10
+      bar:        0.10
+      magnetic:   0.20
+      pulsating:  0.20
+      exploding:  0.25
+    params:
+      period_s: 5
+      impulse_factor: 1.0                   # top Ø
+      requires_ground_ref: physics.auto_jump_requires_ground
+
+###############################################################################
+audio_map:       # Event → SFX enum adı
+  click            : click_sound
+  life_down        : life_lost_sound
+  life_up          : extra_life_sound
+  game_start       : level_start_sound
+  game_over        : game_over_sound
+  new_record       : new_record_sound
+  teleport         : teleport_sound
+  rolling_ball     : rolling_ball_sound
+  fall             : fall_sound
+  magnetic_wave    : magnetic_wave_sound
+  jump             : jump_sound
+  item_pick        : item_pick_sound
+
+###############################################################################
+# SPAWN ALGORITHM (REFERENCE, pseudo)
+# Agent kodunda birebir uygulanacak mantık.
+###############################################################################
+# onLevelLoad(level):
+#   clearActiveFeatures()
+#   spawnDefaultHoles( eval(global.hole_formula) )
+#
+#   bucket = bucketFor(level)
+#   difficulty = difficultyFor(level, bucket)   # thirds kuralı
+#
+#   spawn(bucket.new_feature, difficulty)
+#
+#   for feat in global.retro_priority:
+#       if active.size >= global.max_simultaneous_features: break
+#       chance = bucket.secondary_chances.get(feat, 0)
+#       if rng() < chance and probability(level, feat):
+#           spawn(feat, difficultyFor(level, feat.originBucket))
+#
+# probability(level, feature):
+#   Δ = level - feature.firstAppeared
+#   return global.retro_probability.base * exp(-global.retro_probability.decay_rate * Δ)
+#
+# Pulsating guard:
+#   select = max(physics.min_pulsate, round(totalHoles * bucket.params.affected_fraction))
+###############################################################################
